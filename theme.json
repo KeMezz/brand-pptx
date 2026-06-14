@@ -1,0 +1,51 @@
+{
+  "name": "Default (clean starter)",
+  "colors": {
+    "primary": "27314A",
+    "primaryLight": "49546E",
+    "accent": "5B6CFF",
+    "accentLight": "C7CDFF",
+    "bg": "F4F5FA",
+    "dark": "131722",
+    "gray": "5A6473",
+    "lightGray": "9AA1B2",
+    "border": "E2E5EE",
+    "white": "FFFFFF"
+  },
+  "fonts": {
+    "heading": "Arial",
+    "body": "Arial",
+    "headingCJK": "Noto Sans JP",
+    "bodyCJK": "Noto Sans JP"
+  },
+  "typeScale": {
+    "coverTitle": 44,
+    "coverSubtitle": 18,
+    "sectionTitle": 36,
+    "title": 26,
+    "subtitle": 18,
+    "body": 16,
+    "caption": 12,
+    "kpiValue": 40
+  },
+  "style": {
+    "cornerRadiusIn": 0.1,
+    "pageMarginIn": 0.85,
+    "blockGapIn": 0.4
+  },
+  "template": {
+    "path": "assets/template.pptx"
+  },
+  "layoutMap": {
+    "cover": 0,
+    "section": 2,
+    "content": 1,
+    "contentVisual": 5,
+    "ending": 7
+  },
+  "logo": {
+    "enabled": false,
+    "lightPath": "assets/logo.png",
+    "darkPath": "assets/logo.png"
+  }
+}
