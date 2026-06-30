@@ -36,9 +36,11 @@ metadata:
 
 ### 自社テンプレートを渡された場合（スキルが自動で設定する）
 
-ユーザー設定は **`~/.config/brand-pptx/`** に保存する。ここはスキル更新（`npx skills add` など）で **上書きされない**ので、自社テンプレートや設定が消えない。
+ユーザー設定は **スキルの外**（スキル更新で上書きされない場所）に保存する。既定の保存先は **`~/.config/brand-pptx/`**。
 
-1. `~/.config/brand-pptx/` を作り、テンプレートをそこへコピーする（例: `~/.config/brand-pptx/company.pptx`）。
+> **勝手に作らない**: このフォルダは「ユーザーが自社テンプレートを渡した＝カスタマイズに同意した」場合にのみ作成する。通常利用では何も作成・変更しない。作成前に **保存先をユーザーに一言伝え**、別の場所がよければ環境変数 `$BRAND_PPTX_HOME` で指定してもらう。
+
+1. 保存先（既定 `~/.config/brand-pptx/`、または `$BRAND_PPTX_HOME`）をユーザーに伝えてから作成し、テンプレートをそこへコピーする（例: `~/.config/brand-pptx/company.pptx`）。
 2. `python3 tools/inspect_template.py ~/.config/brand-pptx/company.pptx` でレイアウト一覧（index・名前・プレースホルダー）を取得する。
 3. `~/.config/brand-pptx/theme.json` を作成する（スキル同梱の `theme.json` をコピーして編集するとよい）。`template.path` を自社テンプレート名（例: `"company.pptx"`）にし、`layoutMap` を自社レイアウトの index に合わせる。判断の目安:
    - **cover**: タイトル＋サブタイトルのプレースホルダーがある表紙レイアウト
