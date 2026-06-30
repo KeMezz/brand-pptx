@@ -45,6 +45,8 @@ class Brand:
         self.F = self.theme["fonts"]
         self.TS = self.theme["typeScale"]
         self.LM = self.theme["layoutMap"]
+        # opt-in: layoutMap の役割が null のとき、テンプレートを変更せず theme 色で合成する
+        self.draw_missing = bool((self.theme.get("setup") or {}).get("drawMissingRoles", False))
 
     # --- プレゼン/テンプレート ---
     def new_presentation(self):
@@ -129,9 +131,79 @@ class Brand:
                 if font:
                     r.font.name = font
 
+    # --- 不足ロールの合成（opt-in: theme.setup.drawMissingRoles）---
+    def _dims(self, prs):
+        m = Inches((self.theme.get("style") or {}).get("pageMarginIn", 0.6))
+        return prs.slide_width, prs.slide_height, m
+
+    @staticmethod
+    def _blank_layout(prs):
+        # プレースホルダーが最も少ない＝最も白紙に近いレイアウトを土台にする
+        return min(prs.slide_layouts, key=lambda L: len(list(L.placeholders)))
+
+    def _role_layout(self, prs, role):
+        """layoutMap[role] が int ならそのレイアウト、null/未設定なら白紙を返す。
+        戻り値: (slide, synthesized)"""
+        idx = self.LM.get(role)
+        if idx is not None:
+            return prs.slides.add_slide(prs.slide_layouts[idx]), False
+        return prs.slides.add_slide(self._blank_layout(prs)), True
+
+    def _rect(self, slide, shp, x, y, w, h, color):
+        s = slide.shapes.add_shape(shp, x, y, w, h)
+        s.fill.solid(); s.fill.fore_color.rgb = color; s.line.fill.background()
+        self._flat(s)
+        return s
+
+    def _synth_chrome(self, prs, slide, role):
+        """flag が on のとき、テンプレートに無いロールの装飾を theme 色で「スライドに」描く
+        （テンプレート/マスターは一切変更しない）。"""
+        if not self.draw_missing:
+            return
+        W, H, m = self._dims(prs)
+        if role in ("section", "ending"):
+            self._rect(slide, MSO_SHAPE.RECTANGLE, 0, 0, W, H, self.C["primary"])
+            if role == "section":
+                bh = Inches(1.2)
+                self._rect(slide, MSO_SHAPE.RECTANGLE, m, (H - bh) // 2, Inches(0.14), bh, self.C["accent"])
+        else:  # cover / content / contentVisual
+            sq = Inches(0.32)
+            sy = Inches(2.0) if role == "cover" else Inches(0.62)
+            self._rect(slide, MSO_SHAPE.RECTANGLE, m, sy, sq, sq, self.C["accent"])
+            if role in ("content", "contentVisual"):
+                self._rect(slide, MSO_SHAPE.RECTANGLE, m, H - Inches(0.55), W - m * 2, Inches(0.025), self.C["border"])
+
+    def _synth_text(self, prs, slide, role, title, subtitle=None):
+        """合成スライドにタイトル（必要ならサブタイトル）をテキストボックスで描く。"""
+        W, H, m = self._dims(prs)
+        dark_bg = self.draw_missing and role in ("section", "ending")
+        color = self.C["white"] if dark_bg else self.C["dark"]
+        if role == "cover":
+            size, y, h, align, tx = self.TS["coverTitle"], Inches(2.35), Inches(1.6), PP_ALIGN.LEFT, m
+        elif role == "section":
+            size, h, align, tx = self.TS["sectionTitle"], Inches(1.7), PP_ALIGN.LEFT, m + Inches(0.45)
+            y = (H - h) // 2
+        elif role == "ending":
+            size, h, align, tx = self.TS["sectionTitle"], Inches(1.4), PP_ALIGN.CENTER, m
+            y = (H - h) // 2
+        else:  # content / contentVisual
+            size, y, h, align, tx = self.TS["title"], Inches(0.55), Inches(0.9), PP_ALIGN.LEFT, m
+        box = slide.shapes.add_textbox(tx, y, W - tx - m, h)
+        box.text_frame.paragraphs[0].text = title
+        self.style_text(box.text_frame, size, color, bold=True, align=align,
+                        font=self.F["headingCJK"], anchor=MSO_ANCHOR.MIDDLE)
+        if subtitle and role == "cover":
+            sb = slide.shapes.add_textbox(tx, y + h + Inches(0.05), W - tx - m, Inches(0.6))
+            sb.text_frame.paragraphs[0].text = subtitle
+            self.style_text(sb.text_frame, self.TS["coverSubtitle"], self.C["gray"], font=self.F["bodyCJK"])
+
     # --- スライドビルダー ---
     def add_cover(self, prs, title, subtitle=None):
-        slide = prs.slides.add_slide(prs.slide_layouts[self.LM["cover"]])
+        slide, synth = self._role_layout(prs, "cover")
+        if synth:
+            self._synth_chrome(prs, slide, "cover")
+            self._synth_text(prs, slide, "cover", title, subtitle)
+            return slide
         t = self.title_ph(slide)
         if t:
             t.text = title
@@ -147,7 +219,11 @@ class Brand:
 
     def add_section(self, prs, title):
         # 背景・装飾はテンプレートのレイアウトが持つ。ここでは文字を流し込むだけ。
-        slide = prs.slides.add_slide(prs.slide_layouts[self.LM["section"]])
+        slide, synth = self._role_layout(prs, "section")
+        if synth:
+            self._synth_chrome(prs, slide, "section")
+            self._synth_text(prs, slide, "section", title)
+            return slide
         t = self.title_ph(slide)
         if t:
             t.text = title
@@ -157,7 +233,11 @@ class Brand:
 
     def add_content(self, prs, title, visual=True):
         key = "contentVisual" if visual else "content"
-        slide = prs.slides.add_slide(prs.slide_layouts[self.LM[key]])
+        slide, synth = self._role_layout(prs, key)
+        if synth:
+            self._synth_chrome(prs, slide, key)
+            self._synth_text(prs, slide, key, title)
+            return slide
         t = self.title_ph(slide)
         if t:
             t.text = title
@@ -166,7 +246,11 @@ class Brand:
         return slide
 
     def add_ending(self, prs, title="ご清聴ありがとうございました"):
-        slide = prs.slides.add_slide(prs.slide_layouts[self.LM["ending"]])
+        slide, synth = self._role_layout(prs, "ending")
+        if synth:
+            self._synth_chrome(prs, slide, "ending")
+            self._synth_text(prs, slide, "ending", title)
+            return slide
         t = self.title_ph(slide)
         if t:
             t.text = title

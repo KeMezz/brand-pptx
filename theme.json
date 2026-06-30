@@ -33,6 +33,9 @@
     "pageMarginIn": 0.85,
     "blockGapIn": 0.4
   },
+  "setup": {
+    "drawMissingRoles": false
+  },
   "template": {
     "path": "assets/template.pptx"
   },

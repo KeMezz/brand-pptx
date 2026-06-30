@@ -51,6 +51,17 @@ metadata:
 
 同梱の `assets/template.pptx` のまま進める。**設定は何も要らない。**
 
+### テンプレートに合うレイアウトが無い役割があるとき（任意・opt-in）
+
+自社テンプレートに、ある役割（例: セクション区切り）に向くレイアウトが無い場合:
+
+1. その役割を `theme.json` の `layoutMap` で `null` にする（例: `"section": null`）。
+2. `theme.json` の `setup.drawMissingRoles` を `true` にする（既定は `false`）。
+
+すると、その役割のスライドだけ **theme の色でスライドに直接描画**して補う。
+**テンプレート（マスター/レイアウト）自体は一切変更しない**ので、元のテンプレートは安全。
+`false` のままなら、`null` の役割は白紙レイアウト + タイトルのみの簡素な出力になる。
+
 ---
 
 ## `theme.json` の役割
@@ -61,6 +72,7 @@ metadata:
 | `layoutMap` | 役割（cover/section/content/contentVisual/ending）→ テンプレート内レイアウト index |
 | `colors` | **コードが描く視覚パーツ**（KPI カード・進捗バー・ステップ・テーブル）の色。`#` を付けない 6 桁 hex |
 | `fonts` / `typeScale` | プレースホルダーや視覚パーツに適用するフォント・サイズ |
+| `setup.drawMissingRoles` | （任意・既定 `false`）`layoutMap` が `null` の役割を theme 色でスライドに合成描画する。テンプレート自体は変更しない |
 
 > 表紙やセクションの**背景・装飾はテンプレートが持つ**ので、`colors` は主に「コードが描く部分」と「同梱既定テンプレートの再生成」に効く。
 > 同梱テンプレートは `python3 tools/build_template.py` が `theme.json` の色から生成する（色を変えて再実行すると既定テンプレートの配色も変わる）。
