@@ -35,12 +35,32 @@ def find_skill_dir() -> Path:
     raise FileNotFoundError("theme.json が見つかりません。")
 
 
+def find_config_dir(skill_dir: Path) -> Path:
+    """ユーザー設定（theme.json / 自社テンプレート）の置き場所を返す。
+
+    優先順位: 環境変数 BRAND_PPTX_HOME → ~/.config/brand-pptx → （無ければ）スキル同梱の既定。
+    これにより、npx 等でスキル本体を更新しても、スキル外に置いたユーザー設定は
+    上書きされない（更新で自社テンプレートが消えない）。
+    """
+    cands = []
+    env = os.environ.get("BRAND_PPTX_HOME")
+    if env:
+        cands.append(Path(env))
+    cands.append(Path.home() / ".config" / "brand-pptx")
+    for c in cands:
+        if (c / "theme.json").exists():
+            return c
+    return skill_dir
+
+
 class Brand:
     """theme.json をロードし、色/フォント/サイズと生成ヘルパーを提供する。"""
 
     def __init__(self, skill_dir: Path | None = None):
-        self.dir = skill_dir or find_skill_dir()
-        self.theme = json.loads((self.dir / "theme.json").read_text(encoding="utf-8"))
+        self.skill_dir = skill_dir or find_skill_dir()   # スキル本体（更新で上書きされうる）
+        self.config_dir = find_config_dir(self.skill_dir)  # ユーザー設定（更新で消えない）
+        self.dir = self.config_dir                        # theme.json を読む場所
+        self.theme = json.loads((self.config_dir / "theme.json").read_text(encoding="utf-8"))
         self.C = {k: RGBColor.from_string(v) for k, v in self.theme["colors"].items()}
         self.F = self.theme["fonts"]
         self.TS = self.theme["typeScale"]
@@ -49,16 +69,27 @@ class Brand:
         self.draw_missing = bool((self.theme.get("setup") or {}).get("drawMissingRoles", False))
 
     # --- プレゼン/テンプレート ---
-    def new_presentation(self):
+    def _resolve_template(self):
+        """theme.template.path を解決。config_dir → skill_dir → 同梱既定 の順に探す。"""
         tpath = (self.theme.get("template") or {}).get("path")
         if tpath:
             p = Path(tpath)
-            if not p.is_absolute():
-                p = self.dir / tpath
-            prs = Presentation(str(p))
+            if p.is_absolute():
+                return p if p.exists() else None
+            for base in (self.config_dir, self.skill_dir):  # ユーザー設定優先 → スキル同梱
+                cand = base / tpath
+                if cand.exists():
+                    return cand
+        default = self.skill_dir / "assets" / "template.pptx"  # 既定テンプレートにフォールバック
+        return default if default.exists() else None
+
+    def new_presentation(self):
+        resolved = self._resolve_template()
+        if resolved is not None:
+            prs = Presentation(str(resolved))
             self.using_custom = True
         else:
-            prs = Presentation()
+            prs = Presentation()  # テンプレートが見つからなければ内蔵既定
             self.using_custom = False
         return prs
 

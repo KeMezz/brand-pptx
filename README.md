@@ -49,20 +49,23 @@ Claude Code などで、本スキルを呼び出して資料作成を依頼し�
 
 ## 自社ブランドへの差し替え（手動で行う場合）
 
-Claude に任せず手動で設定するときは、次の 2 つだけです。
+ユーザー設定は **`~/.config/brand-pptx/`** に置きます。スキル本体とは別の場所なので、`npx skills add` などで**スキルを更新しても自社テンプレート・設定は消えません**（スキルが優先して読みます）。`$BRAND_PPTX_HOME` でも場所を指定できます。
 
 **1. テンプレートを差し込む**
 
-自社の `.pptx` を `assets/` に置き、レイアウト index を確認して `theme.json` に書きます。
+自社の `.pptx` を `~/.config/brand-pptx/` に置き、レイアウト index を確認して `~/.config/brand-pptx/theme.json` に書きます（同梱の `theme.json` をコピーして編集すると楽です）。
 
 ```bash
-python3 tools/inspect_template.py assets/your-template.pptx
+mkdir -p ~/.config/brand-pptx
+cp /path/to/company.pptx ~/.config/brand-pptx/
+python3 tools/inspect_template.py ~/.config/brand-pptx/company.pptx
 # [ 0] Title Slide / [ 1] Title and Content / [ 2] Section Header ...
 ```
 
 ```jsonc
+// ~/.config/brand-pptx/theme.json
 {
-  "template": { "path": "assets/your-template.pptx" },
+  "template": { "path": "company.pptx" },
   "layoutMap": { "cover": 0, "section": 4, "content": 7, "contentVisual": 8, "ending": 1 }
 }
 ```

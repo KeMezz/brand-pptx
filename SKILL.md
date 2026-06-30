@@ -36,16 +36,20 @@ metadata:
 
 ### 自社テンプレートを渡された場合（スキルが自動で設定する）
 
-1. テンプレートを `assets/` にコピーする。
-2. `python3 tools/inspect_template.py assets/<file>.pptx` でレイアウト一覧（index・名前・プレースホルダー）を取得する。
-3. 各レイアウトを役割に割り当て、`theme.json` の `layoutMap` を更新する。判断の目安:
+ユーザー設定は **`~/.config/brand-pptx/`** に保存する。ここはスキル更新（`npx skills add` など）で **上書きされない**ので、自社テンプレートや設定が消えない。
+
+1. `~/.config/brand-pptx/` を作り、テンプレートをそこへコピーする（例: `~/.config/brand-pptx/company.pptx`）。
+2. `python3 tools/inspect_template.py ~/.config/brand-pptx/company.pptx` でレイアウト一覧（index・名前・プレースホルダー）を取得する。
+3. `~/.config/brand-pptx/theme.json` を作成する（スキル同梱の `theme.json` をコピーして編集するとよい）。`template.path` を自社テンプレート名（例: `"company.pptx"`）にし、`layoutMap` を自社レイアウトの index に合わせる。判断の目安:
    - **cover**: タイトル＋サブタイトルのプレースホルダーがある表紙レイアウト
    - **section**: 章扉（背景が濃い/ブランド色のことが多い）
    - **content**: タイトル＋本文（body）の標準レイアウト
    - **contentVisual**: タイトルのみ（本文 PH なし）＝図形を自由配置できるレイアウト
    - **ending**: クロージング向けレイアウト
-4. 必要なら `theme.json` の `colors`（KPI カード等の描画色）も自社ブランドに合わせて更新する。
+4. 必要なら `~/.config/brand-pptx/theme.json` の `colors`（KPI カード等の描画色）も自社ブランドに合わせて更新する。
 5. `python3 tools/make_sample.py` でサンプルを出し、崩れていないか確認する。
+
+> 以降スキルは `~/.config/brand-pptx/theme.json` を **優先して**読む（無ければ同梱の既定）。だからスキル本体を更新しても自社設定は保持される。
 
 ### 無い場合
 
@@ -65,6 +69,8 @@ metadata:
 ---
 
 ## `theme.json` の役割
+
+> **読み込み場所**: `~/.config/brand-pptx/theme.json` があればそれを優先（`$BRAND_PPTX_HOME` でも上書き可）。無ければスキル同梱の既定。ユーザー設定をスキル外に置けるので、スキル更新で消えない。
 
 | キー | 役割 |
 |------|------|
@@ -124,19 +130,38 @@ def find_skill_dir():
     return Path.cwd()
 
 SKILL_DIR = find_skill_dir()
-theme = json.loads((SKILL_DIR / "theme.json").read_text(encoding="utf-8"))
+
+def find_config_dir():
+    # ユーザー設定（theme.json/自社テンプレ）は「スキル更新で消えない場所」を優先する。
+    # 優先: $BRAND_PPTX_HOME → ~/.config/brand-pptx → （無ければ）スキル同梱の既定。
+    for c in [os.environ.get("BRAND_PPTX_HOME"), Path.home() / ".config" / "brand-pptx"]:
+        if c and (Path(c) / "theme.json").exists():
+            return Path(c)
+    return SKILL_DIR
+
+CONFIG_DIR = find_config_dir()
+theme = json.loads((CONFIG_DIR / "theme.json").read_text(encoding="utf-8"))
 C  = {k: RGBColor.from_string(v) for k, v in theme["colors"].items()}
 F  = theme["fonts"]
 TS = theme["typeScale"]
 LM = theme["layoutMap"]
 
-# テンプレート解決（既定: assets/template.pptx / 自社: theme.template.path）
-tpath = (theme.get("template") or {}).get("path") or "assets/template.pptx"
-p = Path(tpath)
-if not p.is_absolute():
-    p = SKILL_DIR / tpath
-prs = Presentation(str(p)) if p.exists() else Presentation()
-print("template:", p if p.exists() else "(builtin fallback)")
+# テンプレート解決: config_dir（ユーザー設定）→ skill_dir → 同梱既定 → 内蔵 の順
+def resolve_template():
+    tpath = (theme.get("template") or {}).get("path")
+    if tpath:
+        p = Path(tpath)
+        if p.is_absolute():
+            return p if p.exists() else None
+        for base in (CONFIG_DIR, SKILL_DIR):
+            if (base / tpath).exists():
+                return base / tpath
+    default = SKILL_DIR / "assets" / "template.pptx"
+    return default if default.exists() else None
+
+tpl = resolve_template()
+prs = Presentation(str(tpl)) if tpl else Presentation()
+print("config:", CONFIG_DIR, "| template:", tpl or "(builtin)")
 ```
 
 ### Step 1: 要件確認
